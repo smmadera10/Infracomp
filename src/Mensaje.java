@@ -88,6 +88,7 @@ public class Mensaje {
 	 */
 	synchronized private void enviarRespuestaARemitente()
 	{
+		//.notify() debe usarse en un bloque de código sincronizado
 		synchronized(remitente)
 		{
 			remitente.notify();

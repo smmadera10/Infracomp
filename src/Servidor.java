@@ -102,6 +102,7 @@ public class Servidor extends Thread {
 			
 			while(mensajeActual == null && hayClientes)
 			{
+				//actualizo hayClientes para que no se quede atrapado en el loop
 				hayClientes = canal.darHayClientes();
 				solicitarMensaje();
 				yield();
@@ -109,6 +110,7 @@ public class Servidor extends Thread {
 			
 			if(mensajeActual != null && hayClientes)
 			{
+				//actualizo hayClientes para que no se quede atrapado en el loop
 				hayClientes = canal.darHayClientes();
 
 				synchronized(mensajeActual)

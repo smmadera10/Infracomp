@@ -145,32 +145,6 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 		
 		while(mensajesRespondidos < numeroMensajesAEnviar)
 		{
-			//----
-			//Herramientas para Debug
-			//----
-			
-//			if(id == 8)
-//			{
-//				while(true)
-//				{
-//					System.err.println("El cliente 8 entró en el while");
-//				}
-//			}
-			
-			boolean seRespondieronTodos = mensajesRespondidos == numeroMensajesAEnviar;
-			
-			if(seRespondieronTodos)
-			{
-				while(true)
-				{
-					System.err.println("El cliente " + id + " siguió con el ciclo a pesar de que se respondieron todos");
-				}
-			}
-			
-			//----
-			//Fin Herramientas para Debug
-			//----
-			
 			boolean respuestaAUltimoMensajeEnviado = enviarMensaje();
 			
 			while( !respuestaAUltimoMensajeEnviado )
@@ -179,13 +153,13 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 				respuestaAUltimoMensajeEnviado = enviarMensaje();
 				yield();
 			}
+			
+			//wait() debe usarse en un bloque de código sincronizado
 			synchronized(this)
 			{
 				try 
 				{
-					//System.out.println("Cliente de id " + id + " a punto de esperar");
 					wait();
-					//System.out.println("Cliente de id " + id + " terminó de esperar");
 				} 
 				catch (InterruptedException e)
 				{
@@ -195,7 +169,7 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 			
 			recibirRespuestaMensaje();
 			
-			System.out.println("Se han respondido " + mensajesRespondidos + " para el cliente de id " + id);
+			System.out.println("Se han respondido " + mensajesRespondidos + " para el cliente de id " + id); //TODO
 		}
 		
 		terminar();

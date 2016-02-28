@@ -104,32 +104,27 @@ public class Buffer {
 	{
 		//Nota: Es synchronized para garantizar la integridad de los datos, es 
 		//decir, para que no hayan lecturas sucias
-		synchronized(this)
+
+		for (int i = 0; i < clientes.size(); i++)
 		{
-			synchronized(clientes)
+			Cliente c1 = clientes.get(i);
+			if (c1.compareTo(c) == 0)
 			{
-				synchronized(c)
-				{
-					for (int i = 0; i < clientes.size(); i++)
-					{
-						Cliente c1 = clientes.get(i);
-						if (c1.compareTo(c) == 0)
-						{
-							clientes.remove(i);
-						}
-					}
-
-					numeroActualClientes--;
-					System.out.println("numero actual clientes: " + numeroActualClientes); //TODO
-
-
-//					if (numeroActualClientes == 0)
-//					{
-//						terminarServidores();
-//					}
-				}
+				clientes.remove(i);
 			}
 		}
+
+		numeroActualClientes--;
+		System.out.println("numero actual clientes: " + numeroActualClientes); //TODO
+
+
+		//					if (numeroActualClientes == 0)
+		//					{
+		//						terminarServidores();
+		//					}
+
+
+
 	}
 
 	/**
@@ -211,24 +206,24 @@ public class Buffer {
 			}
 		}
 	}
-	
+
 	public boolean darHayClientes()
 	{
 		return numeroActualClientes > 0;
 	}
 
-//	/**
-//	 * Método que se encarga de avisarles a los threads Servidor que procedan con
-//	 * su terminación
-//	 */
-//	public void terminarServidores()
-//	{
-//	//	System.exit(0);
-//		System.out.println("El buffer mandó a los servers a terminar");//TODO
-//		for(int i = 0; i < servidores.size(); i++)
-//		{
-//			System.out.println("corre el for con server " + i);//TODO
-//			//servidores.get(i).stop();
-//		}
-//	}
+	//	/**
+	//	 * Método que se encarga de avisarles a los threads Servidor que procedan con
+	//	 * su terminación
+	//	 */
+	//	public void terminarServidores()
+	//	{
+	//	//	System.exit(0);
+	//		System.out.println("El buffer mandó a los servers a terminar");
+	//		for(int i = 0; i < servidores.size(); i++)
+	//		{
+	//			System.out.println("corre el for con server " + i);
+	//			//servidores.get(i).stop();
+	//		}
+	//	}
 }

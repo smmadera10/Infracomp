@@ -67,9 +67,9 @@ public class LogisticaAeroportuaria {
 	private void leerInformacionEjecucion()
 	{
 		//TODO
-		numeroClientes = 10;
-		numeroServidores = 10;
-		capacidad = 100;
+		numeroClientes = 20;
+		numeroServidores = 20;
+		capacidad = 20;
 	}
 	
 	public static void main(String[] args)
