@@ -1,6 +1,7 @@
+import java.util.ArrayList;
 import java.util.Random;
 
-public class Cliente extends Thread {
+public class Cliente extends Thread implements Comparable<Cliente> {
 
 	//-------------------------------------------------------------------------------
 	//Constantes
@@ -11,7 +12,7 @@ public class Cliente extends Thread {
 	 * de Cliente podrá enviar durante su ciclo de vida. Se limita esta cantidad
 	 * para que la ejecución del programa se termine en un tiempo razonable.
 	 */
-	private final static int MAX_MENSAJES = 100;
+	private final static int MAX_MENSAJES = 10;
 
 	//-------------------------------------------------------------------------------
 	//Atributos
@@ -21,7 +22,7 @@ public class Cliente extends Thread {
 	 * Identificador entero del Cliente
 	 */
 	private int id;
-	
+
 	/**
 	 * Número de mensajes que enviará el Cliente durante su ciclo de vida. 
 	 * Su valor está entre 1 y MAX_MENSAJES.
@@ -34,17 +35,18 @@ public class Cliente extends Thread {
 	 * servidores.
 	 */
 	private int mensajesRespondidos;
-	
+
 	/**
 	 * Cantidad de mensajes que han sido enviados al servidor en un 
 	 * determinado momento de la ejecución
 	 */
 	private int mensajesEnviados;
-	
+
 	/**
 	 * canal al que el cliente mandará sus mensajes
 	 */
 	private Buffer canal;
+
 
 	//-------------------------------------------------------------------------------
 	//Constructores
@@ -75,14 +77,14 @@ public class Cliente extends Thread {
 	 */
 	public void terminar()
 	{
-		canal.retirarCliente();
+		canal.retirarCliente(this);
 	}
-	
+
 	/**
-	 * Método que es llamado por un objeto Mensaje que este cliente ha producido
-	 * para informarle que se recibió una respuesta. 
+	 * Método que es llamado para procesar la respuesta recibida a un
+	 * cierto mensaje
 	 */
-	
+
 	synchronized public void recibirRespuestaMensaje()
 	{
 		//Nota: es synchronized porque, de recibir más de una respuesta a un mensaje
@@ -95,29 +97,112 @@ public class Cliente extends Thread {
 		//otras palabras, ambos tomarían el valor de mensajesRespondidos de 2 y lo
 		//incrementaría hasta 3, por lo que quedaría registrado un 3 para el Cliente,
 		//a pesar de que 4 mensajes suyos han sido respondidos.
-		
+
 		mensajesRespondidos++;
-		
-		if(mensajesRespondidos == numeroMensajesAEnviar)
-		{
-			canal.retirarCliente();
-			//a continuación, esta instancia termina su ejecución
-		}
 	}
-	
+
 	/**
-	 * Método que se encarga de enviar un mensaje al buffer
+	 * Método que se encarga de enviar un mensaje al buffer. Si es recibido
+	 * por el buffer exitosamente, incrementa el número de mensajes enviados.
+	 * 
+	 * @return true si el mensaje fue recibido por el buffer y almacenado 
+	 *  	exitosamente. False de lo contrario.
 	 */
 	private boolean enviarMensaje()
 	{
-		Mensaje mensaje = new Mensaje(mensajesEnviados, this);
+		Mensaje mensaje = new Mensaje(id + ":" + mensajesEnviados, this);
 		boolean rta = canal.recibirMensaje(mensaje);
+
+		if(rta)
+		{
+			mensajesEnviados++;
+		}
+
 		return rta;
 	}
 	
+	public int darId()
+	{
+		return id;
+	}
+
+	public int darNumeroMensajesAEnviar()
+	{
+		return numeroMensajesAEnviar;
+	}
+	
+	public int darMensajesRespondidos()
+	{
+		return mensajesRespondidos;
+	}
+	
+	public int darMensajesEnviados()
+	{
+		return mensajesEnviados;
+	}
 	public void run()
 	{
-		//TODO
+		
+		while(mensajesRespondidos < numeroMensajesAEnviar)
+		{
+			//----
+			//Herramientas para Debug
+			//----
+			
+//			if(id == 8)
+//			{
+//				while(true)
+//				{
+//					System.err.println("El cliente 8 entró en el while");
+//				}
+//			}
+			
+			boolean seRespondieronTodos = mensajesRespondidos == numeroMensajesAEnviar;
+			
+			if(seRespondieronTodos)
+			{
+				while(true)
+				{
+					System.err.println("El cliente " + id + " siguió con el ciclo a pesar de que se respondieron todos");
+				}
+			}
+			
+			//----
+			//Fin Herramientas para Debug
+			//----
+			
+			boolean respuestaAUltimoMensajeEnviado = enviarMensaje();
+			
+			while( !respuestaAUltimoMensajeEnviado )
+			{
+				System.err.println("El cliente " + id + " está intentado enviar mensajes");
+				respuestaAUltimoMensajeEnviado = enviarMensaje();
+				yield();
+			}
+			synchronized(this)
+			{
+				try 
+				{
+					//System.out.println("Cliente de id " + id + " a punto de esperar");
+					wait();
+					//System.out.println("Cliente de id " + id + " terminó de esperar");
+				} 
+				catch (InterruptedException e)
+				{
+					e.printStackTrace();
+				}
+			}
+			
+			recibirRespuestaMensaje();
+			
+			System.out.println("Se han respondido " + mensajesRespondidos + " para el cliente de id " + id);
+		}
+		
+		terminar();
+	}
+
+	public int compareTo(Cliente c) {
+		return id - c.darId();
 	}
 
 }

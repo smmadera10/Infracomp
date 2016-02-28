@@ -1,28 +1,28 @@
 import java.util.ArrayList;
 
 public class Buffer {
-	
+
 	//-------------------------------------------------------------------------------
 	//Atributos
 	//-------------------------------------------------------------------------------
-	
+
 	/**
 	 * Modela el número inicial de clientes que han de existir durante la 
 	 * ejecución.
 	 */
 	private int numeroClientes;
-	
+
 	/**
 	 * Modela el número de servidores que existirán durante la ejecución.
 	 */
 	private int numeroServidores;
-	
+
 	/**
 	 * Modela la capacidad del buffer para almacenar mensajes producidos
 	 * por los clientes.
 	 */
 	private int capacidad;
-	
+
 	/**
 	 * Contiene el número de clientes que existen durante cualquier determinado
 	 * de la ejecución.
@@ -30,20 +30,20 @@ public class Buffer {
 	private int numeroActualClientes;
 
 	/**
-	 * Lista de mensajes recibidos por el buffer
+	 * Lista de mensajes pendientes de respuesta recibidos por el buffer
 	 */
 	private ArrayList<Mensaje> listaMensajes;
-	
+
 	/**
 	 * Lista de servidores inicializados por el Buffer
 	 */
 	private ArrayList<Servidor> servidores;
-	
+
 	/**
 	 * Lista de clientes inicializados por el buffer
 	 */
 	private ArrayList<Cliente> clientes;
-	
+
 	//-------------------------------------------------------------------------------
 	//Constructores
 	//-------------------------------------------------------------------------------
@@ -53,13 +53,14 @@ public class Buffer {
 		this.numeroClientes = numeroClientes;
 		this.numeroServidores = numeroServidores;
 		this.capacidad = capacidad;
+		numeroActualClientes = numeroClientes;
 		clientes = new ArrayList<Cliente>(numeroClientes);
 		servidores = new ArrayList<Servidor>(numeroServidores);
 		listaMensajes = new ArrayList<Mensaje>(this.capacidad);
-		
+
 		comenzarEjecucion();
 	}
-	
+
 	//-------------------------------------------------------------------------------
 	//Métodos
 	//-------------------------------------------------------------------------------
@@ -71,46 +72,66 @@ public class Buffer {
 	private void comenzarEjecucion()
 	{
 		//Crea y almacena referencias a los servidores
-		for(int i = 0; i < numeroServidores - 1; i++)
+		for(int i = 0; i < numeroServidores; i++)
 		{
 			servidores.add( new Servidor(i, this) );
 		}
-		
+
 		//Crea clientes
-		for(int i = 0; i < numeroClientes - 1; i++)
+		for(int i = 0; i < numeroClientes; i++)
 		{
 			clientes.add( new Cliente(i, this) );
 		}
-		
+
 		//Inicializa los threads de clientes
-		for(int i = 0; i < clientes.size() - 1; i++)
+		for(int i = 0; i < clientes.size(); i++)
 		{
 			clientes.get(i).start();
 		}
-		
+
 		//Inicializa los threads de servidores
-		for(int i = 0; i < servidores.size() - 1; i++)
+		for(int i = 0; i < servidores.size(); i++)
 		{
 			servidores.get(i).start();
 		}
 	}
-	
+
 	/**
 	 * Método llamado por un cliente para avisar que terminó de enviar todos los
 	 * mensajes que debía y todos ellos fueron recibidos correctamente.
 	 */
-	synchronized public void retirarCliente()
+	synchronized public void retirarCliente(Cliente c)
 	{
 		//Nota: Es synchronized para garantizar la integridad de los datos, es 
-		//decir, para que no hayan lecturas sucias		numeroActualClientes--;
-		
-		if (numeroActualClientes == 0)
+		//decir, para que no hayan lecturas sucias
+		synchronized(this)
 		{
-			terminarServidores();
-			//TODO terminar ejecución de servidores y aplicación
+			synchronized(clientes)
+			{
+				synchronized(c)
+				{
+					for (int i = 0; i < clientes.size(); i++)
+					{
+						Cliente c1 = clientes.get(i);
+						if (c1.compareTo(c) == 0)
+						{
+							clientes.remove(i);
+						}
+					}
+
+					numeroActualClientes--;
+					System.out.println("numero actual clientes: " + numeroActualClientes); //TODO
+
+
+//					if (numeroActualClientes == 0)
+//					{
+//						terminarServidores();
+//					}
+				}
+			}
 		}
 	}
-	
+
 	/**
 	 * Método que llama un Cliente para enviar un mensaje al buffer
 	 * @param mensaje objeto de tipo Mensaje que envía el cliente
@@ -121,16 +142,16 @@ public class Buffer {
 		//Nota: no se sabe si es necesario que sea synchronized. Se pone
 		//synchronized por defecto como medida de seguridad a la hora de
 		//implementar.
-		
 		if (listaMensajes.size() < capacidad)
 		{
 			listaMensajes.add(mensaje);
+			System.out.println("cantidad mensajes guardados: " + listaMensajes.size());//TODO
 			return true;
 		}
-		
+
 		return false;
 	}
-	
+
 	/**
 	 * Método que un servidor llamda para solicitar un mensaje del buffer.
 	 * Retorna un mensaje si hay alguno almacenado en la lista. De lo contrario,
@@ -141,21 +162,73 @@ public class Buffer {
 	synchronized public Mensaje solicitarMensaje()
 	{
 		Mensaje rta = null;
-		
-		if (!listaMensajes.isEmpty())
+		synchronized(listaMensajes)
 		{
-			rta = listaMensajes.get(0);
-			listaMensajes.remove(0);
+			if (!listaMensajes.isEmpty())
+			{
+				rta = listaMensajes.get(0);
+				listaMensajes.remove(0);
+			}
 		}
-		
+
+		if (numeroActualClientes == 2)
+		{
+			imprimirEstadoAplicacion(); //TODO
+		}
 		return rta;
+
+	}
+
+	//Para debugging:
+	//TODO
+	public void imprimirEstadoAplicacion()
+	{
+		System.out.println("Quedan " + numeroActualClientes + " clientes.");
+		System.out.println("Los clientes almacenados que quedan son: " + clientes.size());
+		System.out.println("Los clientes restantes son:");
+
+		for(int i = 0; i < clientes.size(); i++)
+		{
+			Cliente actual = clientes.get(i);
+			System.out.println("El cliente " + actual.darId() + ", con " + actual.darMensajesEnviados() + 
+					" mensajes enviados y \n"
+					+ ( actual.darNumeroMensajesAEnviar() - actual.darMensajesRespondidos() ) + " mensajes"
+					+ " que faltan por respuesta");
+		}
+		System.out.println("Hay " + listaMensajes.size() + " mensajes sin responder.");
+		System.out.println("Los servidores están respondiendo actualmente los mensajes de siguiente id:");
+
+		for (int i = 0; i < servidores.size(); i++)
+		{
+			Mensaje mActual = servidores.get(i).darMensajeActual();
+			if (mActual != null)
+			{
+				System.out.println("Servidor " + i + " está respondiendo " + mActual.darId());
+			}
+			else
+			{
+				System.out.println("Servidor " + i + " no está respondiendo ningún mensaje");
+			}
+		}
 	}
 	
-	/**
-	 * Método que se encarga de terminar todos los threads
-	 */
-	public void terminarServidores()
+	public boolean darHayClientes()
 	{
-		//TODO
+		return numeroActualClientes > 0;
 	}
+
+//	/**
+//	 * Método que se encarga de avisarles a los threads Servidor que procedan con
+//	 * su terminación
+//	 */
+//	public void terminarServidores()
+//	{
+//	//	System.exit(0);
+//		System.out.println("El buffer mandó a los servers a terminar");//TODO
+//		for(int i = 0; i < servidores.size(); i++)
+//		{
+//			System.out.println("corre el for con server " + i);//TODO
+//			//servidores.get(i).stop();
+//		}
+//	}
 }

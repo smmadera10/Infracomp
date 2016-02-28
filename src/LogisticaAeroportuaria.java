@@ -67,11 +67,14 @@ public class LogisticaAeroportuaria {
 	private void leerInformacionEjecucion()
 	{
 		//TODO
+		numeroClientes = 10;
+		numeroServidores = 10;
+		capacidad = 100;
 	}
 	
 	public static void main(String[] args)
 	{
-		
+		LogisticaAeroportuaria la = new LogisticaAeroportuaria();
 	}
 	
 }
