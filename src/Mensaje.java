@@ -88,13 +88,16 @@ public class Mensaje {
 	 */
 	synchronized private void enviarRespuestaARemitente()
 	{
-		//.notify() debe usarse en un bloque de código sincronizado
-		synchronized(remitente)
+		//notify() debe usarse en un bloque de código sincronizado
+		synchronized(this)
 		{
-			remitente.notify();
+			synchronized(remitente)
+			{
+				remitente.notify();
+			}
 		}
 	}
-	
+
 	public String darId()
 	{
 		return id;

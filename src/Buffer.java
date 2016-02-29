@@ -27,12 +27,12 @@ public class Buffer {
 	 * Contiene el número de clientes que existen durante cualquier determinado
 	 * de la ejecución.
 	 */
-	private int numeroActualClientes;
+	volatile private int numeroActualClientes;
 
 	/**
 	 * Lista de mensajes pendientes de respuesta recibidos por el buffer
 	 */
-	private ArrayList<Mensaje> listaMensajes;
+	 private ArrayList<Mensaje> listaMensajes;
 
 	/**
 	 * Lista de servidores inicializados por el Buffer
@@ -43,6 +43,8 @@ public class Buffer {
 	 * Lista de clientes inicializados por el buffer
 	 */
 	private ArrayList<Cliente> clientes;
+	
+	private long start; //F
 
 	//-------------------------------------------------------------------------------
 	//Constructores
@@ -50,6 +52,7 @@ public class Buffer {
 
 	public Buffer(int numeroClientes, int numeroServidores, int capacidad)
 	{
+		start = System.nanoTime();
 		this.numeroClientes = numeroClientes;
 		this.numeroServidores = numeroServidores;
 		this.capacidad = capacidad;
@@ -102,20 +105,23 @@ public class Buffer {
 	 */
 	synchronized public void retirarCliente(Cliente c)
 	{
-		//Nota: Es synchronized para garantizar la integridad de los datos, es 
-		//decir, para que no hayan lecturas sucias
-
-		for (int i = 0; i < clientes.size(); i++)
+		synchronized(this)
 		{
-			Cliente c1 = clientes.get(i);
-			if (c1.compareTo(c) == 0)
-			{
-				clientes.remove(i);
-			}
-		}
+			//Nota: Es synchronized para garantizar la integridad de los datos, es 
+			//decir, para que no hayan lecturas sucias
 
-		numeroActualClientes--;
-		System.out.println("numero actual clientes: " + numeroActualClientes); //TODO
+			for (int i = 0; i < clientes.size(); i++)
+			{
+				Cliente c1 = clientes.get(i);
+				if (c1.compareTo(c) == 0)
+				{
+					clientes.remove(i);
+				}
+			}
+
+			numeroActualClientes--;
+			System.out.println("numero actual clientes: " + numeroActualClientes); //TODO
+		}
 
 
 		//					if (numeroActualClientes == 0)
@@ -137,93 +143,105 @@ public class Buffer {
 		//Nota: no se sabe si es necesario que sea synchronized. Se pone
 		//synchronized por defecto como medida de seguridad a la hora de
 		//implementar.
-		if (listaMensajes.size() < capacidad)
-		{
-			listaMensajes.add(mensaje);
-			System.out.println("cantidad mensajes guardados: " + listaMensajes.size());//TODO
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
-	 * Método que un servidor llamda para solicitar un mensaje del buffer.
-	 * Retorna un mensaje si hay alguno almacenado en la lista. De lo contrario,
-	 * retorna null
-	 * @return un mensaje si la lista de mensajes no está vacía. Null de lo 
-	 * 			contrario.
-	 */
-	synchronized public Mensaje solicitarMensaje()
-	{
-		Mensaje rta = null;
 		synchronized(listaMensajes)
 		{
-			if (!listaMensajes.isEmpty())
+			synchronized(this)
 			{
-				rta = listaMensajes.get(0);
-				listaMensajes.remove(0);
+				if (listaMensajes.size() < capacidad)
+				{
+					listaMensajes.add(mensaje);
+					System.out.println("cantidad mensajes guardados: " + listaMensajes.size());//TODO
+					return true;
+				}
+			}
+
+		}
+		return false;
+	}
+		/**
+		 * Método que un servidor llamda para solicitar un mensaje del buffer.
+		 * Retorna un mensaje si hay alguno almacenado en la lista. De lo contrario,
+		 * retorna null
+		 * @return un mensaje si la lista de mensajes no está vacía. Null de lo 
+		 * 			contrario.
+		 */
+		synchronized public Mensaje solicitarMensaje()
+		{
+			//F ->
+			long actual = System.nanoTime();
+			if( (actual - start) / 1000000000 > 10)
+			{
+				System.exit(0);
+			}
+			
+			//-> F
+			Mensaje rta = null;
+			synchronized(listaMensajes)
+			{
+				if (!listaMensajes.isEmpty())
+				{
+					rta = listaMensajes.get(0);
+					listaMensajes.remove(0);
+				}
+			}
+
+//					if(numeroActualClientes == 1)
+//						imprimirEstadoAplicacion(); //TODO
+			return rta;
+
+		}
+
+		//Para debugging:
+		//TODO
+		public void imprimirEstadoAplicacion()
+		{
+			System.out.println("hay " + listaMensajes.size() + " mensajes almacenados por responder");
+			System.out.println("Quedan " + numeroActualClientes + " clientes.");
+			System.out.println("Los clientes almacenados que quedan son: " + clientes.size());
+			System.out.println("Los clientes restantes son:");
+
+			for(int i = 0; i < clientes.size(); i++)
+			{
+				Cliente actual = clientes.get(i);
+				System.out.println("El cliente " + actual.darId() + ", con " + actual.darMensajesEnviados() + 
+						" mensajes enviados y \n"
+						+ ( actual.darNumeroMensajesAEnviar() - actual.darMensajesRespondidos() ) + " mensajes"
+						+ " que faltan por respuesta");
+			}
+			System.out.println("Hay " + listaMensajes.size() + " mensajes sin responder.");
+			System.out.println("Los servidores están respondiendo actualmente los mensajes de siguiente id:");
+
+			for (int i = 0; i < servidores.size(); i++)
+			{
+				Mensaje mActual = servidores.get(i).darMensajeActual();
+				if (mActual != null)
+				{
+					System.out.println("Servidor " + i + " está respondiendo " + mActual.darId());
+				}
+				else
+				{
+					System.out.println("Servidor " + i + " no está respondiendo ningún mensaje");
+				}
 			}
 		}
 
-		if (numeroActualClientes == 2)
+		public boolean darHayClientes()
 		{
-			imprimirEstadoAplicacion(); //TODO
+			return numeroActualClientes > 0;
 		}
-		return rta;
 
+		//	/**
+		//	 * Método que se encarga de avisarles a los threads Servidor que procedan con
+		//	 * su terminación
+		//	 */
+		//	public void terminarServidores()
+		//	{
+		//	//	System.exit(0);
+		//		System.out.println("El buffer mandó a los servers a terminar");
+		//		for(int i = 0; i < servidores.size(); i++)
+		//		{
+		//			System.out.println("corre el for con server " + i);
+		//			//servidores.get(i).stop();
+		//		}
+		//	}
 	}
-
-	//Para debugging:
-	//TODO
-	public void imprimirEstadoAplicacion()
-	{
-		System.out.println("Quedan " + numeroActualClientes + " clientes.");
-		System.out.println("Los clientes almacenados que quedan son: " + clientes.size());
-		System.out.println("Los clientes restantes son:");
-
-		for(int i = 0; i < clientes.size(); i++)
-		{
-			Cliente actual = clientes.get(i);
-			System.out.println("El cliente " + actual.darId() + ", con " + actual.darMensajesEnviados() + 
-					" mensajes enviados y \n"
-					+ ( actual.darNumeroMensajesAEnviar() - actual.darMensajesRespondidos() ) + " mensajes"
-					+ " que faltan por respuesta");
-		}
-		System.out.println("Hay " + listaMensajes.size() + " mensajes sin responder.");
-		System.out.println("Los servidores están respondiendo actualmente los mensajes de siguiente id:");
-
-		for (int i = 0; i < servidores.size(); i++)
-		{
-			Mensaje mActual = servidores.get(i).darMensajeActual();
-			if (mActual != null)
-			{
-				System.out.println("Servidor " + i + " está respondiendo " + mActual.darId());
-			}
-			else
-			{
-				System.out.println("Servidor " + i + " no está respondiendo ningún mensaje");
-			}
-		}
-	}
-
-	public boolean darHayClientes()
-	{
-		return numeroActualClientes > 0;
-	}
-
-	//	/**
-	//	 * Método que se encarga de avisarles a los threads Servidor que procedan con
-	//	 * su terminación
-	//	 */
-	//	public void terminarServidores()
-	//	{
-	//	//	System.exit(0);
-	//		System.out.println("El buffer mandó a los servers a terminar");
-	//		for(int i = 0; i < servidores.size(); i++)
-	//		{
-	//			System.out.println("corre el for con server " + i);
-	//			//servidores.get(i).stop();
-	//		}
-	//	}
-}

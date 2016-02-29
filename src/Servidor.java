@@ -52,21 +52,21 @@ public class Servidor extends Thread {
 	//Métodos
 	//-------------------------------------------------------------------------------
 
-//	/**
-//	 * Método que llama el buffer para avisarle al servidor que no hay más clientes
-//	 * que atender, y que puede terminar su ejecución
-//	 */
-//	synchronized public void recibirNoHayClientes()
-//	{
-//		System.out.println("El servidor " + id + " recibió la orden de terminar");
-//
-//		this.interrupt();
-//		synchronized(this)
-//		{
-//			System.out.println("El servidor " + id + " recibió la orden de terminar");
-//			hayClientes = false;
-//		}
-//	}
+	//	/**
+	//	 * Método que llama el buffer para avisarle al servidor que no hay más clientes
+	//	 * que atender, y que puede terminar su ejecución
+	//	 */
+	//	synchronized public void recibirNoHayClientes()
+	//	{
+	//		System.out.println("El servidor " + id + " recibió la orden de terminar");
+	//
+	//		this.interrupt();
+	//		synchronized(this)
+	//		{
+	//			System.out.println("El servidor " + id + " recibió la orden de terminar");
+	//			hayClientes = false;
+	//		}
+	//	}
 	/**
 	 * Método que se encarga de solicitar un mensaje del buffer y almcenarlo como
 	 * mensajeActual
@@ -75,7 +75,10 @@ public class Servidor extends Thread {
 	{
 		//Nota: Es synchronized para evitar que el mismo mensaje sea enviado como
 		//respuesta a dos o más servidores que estén solicitando al mismo tiempo.
-		mensajeActual = canal.solicitarMensaje();
+		synchronized(this)
+		{
+			mensajeActual = canal.solicitarMensaje();
+		}
 	}
 
 	/**
@@ -99,21 +102,23 @@ public class Servidor extends Thread {
 		while(hayClientes)
 		{
 			hayClientes = canal.darHayClientes();
-			
-			while(mensajeActual == null && hayClientes)
+
+			synchronized(this)
 			{
-				//actualizo hayClientes para que no se quede atrapado en el loop
-				hayClientes = canal.darHayClientes();
-				solicitarMensaje();
-				yield();
+				while(mensajeActual == null && hayClientes)
+				{
+					//actualizo hayClientes para que no se quede atrapado en el loop
+					hayClientes = canal.darHayClientes();
+					solicitarMensaje();
+					yield();
+				}
 			}
-			
 			if(mensajeActual != null && hayClientes)
 			{
 				//actualizo hayClientes para que no se quede atrapado en el loop
 				hayClientes = canal.darHayClientes();
 
-				synchronized(mensajeActual)
+				synchronized(this)
 				{
 					responderMensaje();
 				}

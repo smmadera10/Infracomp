@@ -47,6 +47,11 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	 */
 	private Buffer canal;
 
+	/**
+	 * true si ya terminó, false de lo contrario
+	 */
+	boolean termino;
+
 
 	//-------------------------------------------------------------------------------
 	//Constructores
@@ -60,6 +65,7 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	public Cliente(int id, Buffer canal)
 	{
 		super();
+		termino = false;
 		this.id = id;
 		this.canal = canal;
 		mensajesRespondidos = 0;
@@ -77,7 +83,11 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	 */
 	public void terminar()
 	{
-		canal.retirarCliente(this);
+		synchronized(this)
+		{
+			canal.retirarCliente(this);
+			termino = true;
+		}
 	}
 
 	/**
@@ -98,7 +108,15 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 		//incrementaría hasta 3, por lo que quedaría registrado un 3 para el Cliente,
 		//a pesar de que 4 mensajes suyos han sido respondidos.
 
-		mensajesRespondidos++;
+		synchronized(this)
+		{
+			mensajesRespondidos++;
+
+			if (numeroMensajesAEnviar == mensajesRespondidos)
+			{
+				terminar();
+			}
+		}
 	}
 
 	/**
@@ -120,7 +138,7 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 
 		return rta;
 	}
-	
+
 	public int darId()
 	{
 		return id;
@@ -130,30 +148,33 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	{
 		return numeroMensajesAEnviar;
 	}
-	
+
 	public int darMensajesRespondidos()
 	{
 		return mensajesRespondidos;
 	}
-	
+
 	public int darMensajesEnviados()
 	{
 		return mensajesEnviados;
 	}
 	public void run()
 	{
-		
 		while(mensajesRespondidos < numeroMensajesAEnviar)
 		{
-			boolean respuestaAUltimoMensajeEnviado = enviarMensaje();
-			
-			while( !respuestaAUltimoMensajeEnviado )
+			synchronized(this)
 			{
-				System.err.println("El cliente " + id + " está intentado enviar mensajes");
-				respuestaAUltimoMensajeEnviado = enviarMensaje();
-				yield();
+				boolean respuestaAUltimoMensajeEnviado = enviarMensaje();
+
+				while( !respuestaAUltimoMensajeEnviado )
+				{
+					System.err.println("El cliente " + id + " está intentado enviar mensajes");
+					respuestaAUltimoMensajeEnviado = enviarMensaje();
+					yield();
+				}
+
 			}
-			
+
 			//wait() debe usarse en un bloque de código sincronizado
 			synchronized(this)
 			{
@@ -166,13 +187,19 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 					e.printStackTrace();
 				}
 			}
-			
-			recibirRespuestaMensaje();
-			
+
+			synchronized(this)
+			{
+				recibirRespuestaMensaje();
+			}
+
 			System.out.println("Se han respondido " + mensajesRespondidos + " para el cliente de id " + id); //TODO
 		}
-		
-		terminar();
+
+		if(!termino)
+		{
+			terminar();
+		}
 	}
 
 	public int compareTo(Cliente c) {
