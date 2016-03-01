@@ -83,8 +83,9 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	 */
 	public void terminar()
 	{
-		synchronized(this)
+		if(!termino)
 		{
+			System.out.println("el cliente " + id + " debió terminar"); //TODO
 			canal.retirarCliente(this);
 			termino = true;
 		}
@@ -160,40 +161,43 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	}
 	public void run()
 	{
-		while(mensajesRespondidos < numeroMensajesAEnviar)
+		while(mensajesRespondidos < numeroMensajesAEnviar && !termino)
 		{
 			synchronized(this)
 			{
-				boolean respuestaAUltimoMensajeEnviado = enviarMensaje();
-
-				while( !respuestaAUltimoMensajeEnviado )
+				//System.err.println("El cliente " + id + " está intentado enviar mensajes");
+				if ( enviarMensaje() )
 				{
-					System.err.println("El cliente " + id + " está intentado enviar mensajes");
-					respuestaAUltimoMensajeEnviado = enviarMensaje();
-					yield();
+					try {
+						wait();
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					recibirRespuestaMensaje();
 				}
-
+				yield();
 			}
 
 			//wait() debe usarse en un bloque de código sincronizado
-			synchronized(this)
-			{
-				try 
-				{
-					wait();
-				} 
-				catch (InterruptedException e)
-				{
-					e.printStackTrace();
-				}
-			}
+			//			synchronized(this)
+			//			{
+			//				try 
+			//				{
+			//					wait();
+			//				} 
+			//				catch (InterruptedException e)
+			//				{
+			//					e.printStackTrace();
+			//				}
+			//			}
+			//
+			//			synchronized(this)
+			//			{
+			//				recibirRespuestaMensaje();
+			//			}
 
-			synchronized(this)
-			{
-				recibirRespuestaMensaje();
-			}
-
-			System.out.println("Se han respondido " + mensajesRespondidos + " para el cliente de id " + id); //TODO
+			//System.out.println("Se han respondido " + mensajesRespondidos + " de " + numeroMensajesAEnviar + " para el cliente de id " + id); //TODO
 		}
 
 		if(!termino)

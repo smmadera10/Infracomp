@@ -110,16 +110,17 @@ public class Buffer {
 			//Nota: Es synchronized para garantizar la integridad de los datos, es 
 			//decir, para que no hayan lecturas sucias
 
-			for (int i = 0; i < clientes.size(); i++)
-			{
-				Cliente c1 = clientes.get(i);
-				if (c1.compareTo(c) == 0)
-				{
-					clientes.remove(i);
-				}
-			}
+//			for (int i = 0; i < clientes.size(); i++)
+//			{
+//				Cliente c1 = clientes.get(i);
+//				if (c1.compareTo(c) == 0)
+//				{
+//					clientes.remove(i);
+//				}
+//			}
 
 			numeroActualClientes--;
+			
 			System.out.println("numero actual clientes: " + numeroActualClientes); //TODO
 		}
 
@@ -149,8 +150,8 @@ public class Buffer {
 			{
 				if (listaMensajes.size() < capacidad)
 				{
-					listaMensajes.add(mensaje);
 					System.out.println("cantidad mensajes guardados: " + listaMensajes.size());//TODO
+					listaMensajes.add(mensaje);
 					return true;
 				}
 			}
