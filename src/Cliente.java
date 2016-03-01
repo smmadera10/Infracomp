@@ -1,7 +1,7 @@
 import java.util.ArrayList;
 import java.util.Random;
 
-public class Cliente extends Thread implements Comparable<Cliente> {
+public class Cliente extends Thread {
 
 	//-------------------------------------------------------------------------------
 	//Constantes
@@ -47,12 +47,6 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	 */
 	private Buffer canal;
 
-	/**
-	 * true si ya terminó, false de lo contrario
-	 */
-	boolean termino;
-
-
 	//-------------------------------------------------------------------------------
 	//Constructores
 	//-------------------------------------------------------------------------------
@@ -65,7 +59,6 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	public Cliente(int id, Buffer canal)
 	{
 		super();
-		termino = false;
 		this.id = id;
 		this.canal = canal;
 		mensajesRespondidos = 0;
@@ -83,12 +76,7 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	 */
 	public void terminar()
 	{
-		if(!termino)
-		{
-			System.out.println("el cliente " + id + " debió terminar"); //TODO
-			canal.retirarCliente(this);
-			termino = true;
-		}
+		canal.retirarCliente(this);
 	}
 
 	/**
@@ -98,16 +86,7 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 
 	synchronized public void recibirRespuestaMensaje()
 	{
-		//Nota: es synchronized porque, de recibir más de una respuesta a un mensaje
-		//al mismo tiempo, podrían haber inconsistencias en la información. 
-		//Por ejemplo, el tercer mensaje es respondido al mismo tiempo que el cuatro. 
-		//Si no fuera synchronized, el tercer mensaje diría que, contándose a sí mismo,
-		//han habido tres mensajes respondidos. Ya que esta información no se ha 
-		//registrado para cuando el cuarto es respondido, el cuarto mensaje también
-		//dice que, contándose a sí mismo, se han respondido tres mensajes. En
-		//otras palabras, ambos tomarían el valor de mensajesRespondidos de 2 y lo
-		//incrementaría hasta 3, por lo que quedaría registrado un 3 para el Cliente,
-		//a pesar de que 4 mensajes suyos han sido respondidos.
+		//Nota: es synchronized para que no hayan lecturas sucias
 
 		synchronized(this)
 		{
@@ -161,53 +140,28 @@ public class Cliente extends Thread implements Comparable<Cliente> {
 	}
 	public void run()
 	{
-		while(mensajesRespondidos < numeroMensajesAEnviar && !termino)
+		while(mensajesRespondidos < numeroMensajesAEnviar )
 		{
 			synchronized(this)
 			{
-				//System.err.println("El cliente " + id + " está intentado enviar mensajes");
 				if ( enviarMensaje() )
 				{
-					try {
+					try 
+					{
 						wait();
-					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
+					}
+
+					catch (InterruptedException e)
+					{
 						e.printStackTrace();
 					}
+					
 					recibirRespuestaMensaje();
 				}
 				yield();
 			}
-
-			//wait() debe usarse en un bloque de código sincronizado
-			//			synchronized(this)
-			//			{
-			//				try 
-			//				{
-			//					wait();
-			//				} 
-			//				catch (InterruptedException e)
-			//				{
-			//					e.printStackTrace();
-			//				}
-			//			}
-			//
-			//			synchronized(this)
-			//			{
-			//				recibirRespuestaMensaje();
-			//			}
-
-			//System.out.println("Se han respondido " + mensajesRespondidos + " de " + numeroMensajesAEnviar + " para el cliente de id " + id); //TODO
 		}
 
-		if(!termino)
-		{
-			terminar();
-		}
-	}
-
-	public int compareTo(Cliente c) {
-		return id - c.darId();
 	}
 
 }
