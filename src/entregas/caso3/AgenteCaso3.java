@@ -1,4 +1,4 @@
-package entregas.caso2;
+package entregas.caso3;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,7 +10,6 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -19,6 +18,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Random;
 
@@ -34,7 +34,7 @@ import javax.security.auth.x500.X500Principal;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 
 
-public class Agente {
+public class AgenteCaso3 {
 
 	//-------------------------------------------------------------------------------
 	//Constantes
@@ -122,11 +122,18 @@ public class Agente {
 	//Constructores
 	//-------------------------------------------------------------------------------
 
-	public Agente() throws IOException, CertificateException, NoSuchAlgorithmException, InvalidKeyException, IllegalStateException, SignatureException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException
+	public AgenteCaso3(boolean usaSeguridad) throws Exception
 	{
 		generarParLlaves();
 		iniciarComunicacion();
-		realizarComunicacion();
+		if(usaSeguridad)
+		{
+			realizarComunicacionConSeguridad();
+		}
+		else
+		{
+			realizarComunicacionSinSeguridad();
+		}
 	}
 
 	//-------------------------------------------------------------------------------
@@ -147,24 +154,20 @@ public class Agente {
 	}
 
 	/**
-	 * Realiza la comunicación descrita por el enunciado del caso 2
-	 * @throws IOException
-	 * @throws CertificateException 
-	 * @throws SignatureException 
-	 * @throws NoSuchAlgorithmException 
-	 * @throws IllegalStateException 
-	 * @throws InvalidKeyException 
-	 * @throws BadPaddingException 
-	 * @throws IllegalBlockSizeException 
-	 * @throws NoSuchPaddingException 
+	 * Realiza la comunicación con seguridad descrita por el enunciado del caso 2
+	 * @throws Exception 
 	 */
-	private void realizarComunicacion() throws IOException, CertificateException, InvalidKeyException, IllegalStateException, NoSuchAlgorithmException, SignatureException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException
+	private void realizarComunicacionConSeguridad() throws Exception
 	{
+		//Se usan para medir el tiempo de respuesta de diferentes transacciones
+		float tiempo1 = 0;
+		float tiempo2 = 0;
+
 		pw.println("HOLA");
 
 		if (! recibirRespuesta().equals(INICIO) )
 		{
-			System.err.println("error en protocolo. Terminando");
+			ReporteTransaccion.getInstance().transaccionPerdida();
 			terminarComunicacion();
 		}
 
@@ -172,6 +175,7 @@ public class Agente {
 
 		recibirRespuesta(); 
 
+		tiempo1 = System.nanoTime();
 		X509Certificate cert = generarCertificadoDigital();
 		byte[] certEncoded = cert.getEncoded();
 
@@ -192,6 +196,7 @@ public class Agente {
 		//		System.out.println(Transformacion.transformar(bytes) ); 
 
 		PublicKey llavePublicaServidor = null;
+		IndicadorTransaccion tr1 = null;
 		try
 		{
 			X509Certificate certServidor = (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(intermediario.getInputStream());
@@ -200,11 +205,18 @@ public class Agente {
 			System.out.println("cogió el certificado");
 
 			pw.println(ESTADO_OK);
+			tiempo2 = System.nanoTime();
+
+			//Tiempo transacción autenticación
+
+			float tiempoEnSegundos = (tiempo2 - tiempo1) / 1000000000;
+			tr1 = new IndicadorTransaccion(IndicadorTransaccion.TIPO_AUTENTICACION, tiempoEnSegundos);
 		}
 		catch (Exception e)
 		{
 			e.printStackTrace();
 			pw.println(ESTADO_ERROR);
+			return;
 		}
 
 		//Obtener y descifrar la llave simétrica
@@ -223,6 +235,7 @@ public class Agente {
 		String posicion = "41 24.2028";
 		byte[] posicionCifrada = cifrar(posicion.getBytes(), llaveSimetrica, ALGORITMO_SIMETRICO);
 		pw.println("ACT1:" + Transformacion.transformar(posicionCifrada));
+		tiempo1 = System.nanoTime();
 
 		//ACT2
 		SecretKey llaveSim2 = new SecretKeySpec(llaveSimetrica.getEncoded(), "HMACSHA1");
@@ -232,8 +245,107 @@ public class Agente {
 		pw.println("ACT2:" + Transformacion.transformar(hashPosicionCifrado) );
 
 		recibirRespuesta();
+		tiempo2 = System.nanoTime();
 
+		//Tiempo transacción actualización
+		float ts = (tiempo2 - tiempo1) / 1000000000;
+
+		ReporteTransaccion.getInstance().agregarTransaccion(tr1);
+		ReporteTransaccion.getInstance().agregarTransaccion(new IndicadorTransaccion(IndicadorTransaccion.TIPO_ACTUALIZACION, ts));
 		terminarComunicacion();
+
+	}
+	
+	/**
+	 * Realiza la comunicación sin seguridad descrita por el enunciado del caso 2
+	 * @throws Exception 
+	 */
+	private void realizarComunicacionSinSeguridad() throws Exception
+	{
+		//Se usan para medir el tiempo de respuesta de diferentes transacciones
+		float tiempo1 = 0;
+		float tiempo2 = 0;
+
+		pw.println("HOLA");
+
+		if (! recibirRespuesta().equals(INICIO) )
+		{
+			ReporteTransaccion.getInstance().transaccionPerdida();
+			terminarComunicacion();
+		}
+
+		pw.println("ALGORITMOS:" + ALGORITMO_SIMETRICO + ":RSA:" + HMAC);
+
+		recibirRespuesta(); 
+
+		tiempo1 = System.nanoTime();
+		X509Certificate cert = generarCertificadoDigital();
+		byte[] certEncoded = cert.getEncoded();
+
+		pw.println("CERCLNT:");
+		intermediario.getOutputStream().write(certEncoded);
+		intermediario.getOutputStream().flush();
+
+		System.err.println("funcionó hasta el envío del cert");
+
+		recibirRespuesta();
+
+		//		byte[] bytes = new byte[520];
+		//		InputStream bis = intermediario.getInputStream(); 
+		//		bis.read(bytes, 0, 520);
+		//		CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
+		//		InputStream in = new ByteArrayInputStream(bytes);
+		//		X509Certificate certServidor = (X509Certificate)certFactory.generateCertificate(in);
+		//		System.out.println(Transformacion.transformar(bytes) ); 
+
+		IndicadorTransaccion tr1 = null;
+		
+		try
+		{
+//			X509Certificate certServidor = (X509Certificate) CertificateFactory.getInstance("X.509").generateCertificate(intermediario.getInputStream());
+//			llavePublicaServidor = certServidor.getPublicKey();
+
+			System.out.println("cogió el certificado");
+
+			pw.println(ESTADO_OK);
+			tiempo2 = System.nanoTime();
+
+			//Tiempo transacción autenticación
+
+			float tiempoEnSegundos = (tiempo2 - tiempo1) / 1000000000;
+			tr1 = new IndicadorTransaccion(IndicadorTransaccion.TIPO_AUTENTICACION, tiempoEnSegundos);
+		}
+		
+		catch (Exception e)
+		{
+			e.printStackTrace();
+			pw.println(ESTADO_ERROR);
+			return;
+		}
+
+		recibirRespuesta();
+
+		pw.println("DATA");
+
+		recibirRespuesta();
+
+		//ACT1
+		pw.println("ACT1");
+		tiempo1 = System.nanoTime();
+
+		//ACT2
+		pw.println("ACT2");
+		recibirRespuesta();
+		tiempo2 = System.nanoTime();
+
+		
+		//Tiempo transacción actualización
+		float ts = (tiempo2 - tiempo1) / 1000000000;
+		
+		ReporteTransaccion.getInstance().agregarTransaccion(tr1);
+		ReporteTransaccion.getInstance().agregarTransaccion(new IndicadorTransaccion(IndicadorTransaccion.TIPO_ACTUALIZACION, ts));
+		terminarComunicacion();
+
 	}
 
 	private byte[] generarSecureHash(byte[] data, SecretKey llave, String algoritmo) throws NoSuchAlgorithmException, InvalidKeyException
@@ -258,7 +370,6 @@ public class Agente {
 		X509V3CertificateGenerator certGen = new X509V3CertificateGenerator();
 		X500Principal nombre = new X500Principal("CN=Test V3 Certificate");
 		BigInteger serialAleatorio = new BigInteger( 10, new Random() );
-		
 
 		//Configuración fecha actual y 
 		Date fechaActual = new Date();
@@ -345,6 +456,7 @@ public class Agente {
 			if(rta.equals(ESTADO_ERROR))
 			{
 				System.err.println("Error reportado por el servidor. Terminando conexión.");
+				ReporteTransaccion.getInstance().transaccionPerdida();
 				terminarComunicacion();
 			}
 			else
